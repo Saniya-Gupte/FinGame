@@ -185,49 +185,47 @@ wave_config     — user_id, week_number, enemy_count, enemy_speed, enemy_hp, sp
 
 ---
 
-### Block 5 — Enemy Waves & Combat (~3 hrs)
-- [ ] Enemy sprites moving along path
-- [ ] Wave spawner reads config from Supabase (set by Game Engine Agent)
-- [ ] Tower attack logic (range detection, projectiles, enemy HP)
-- [ ] City HP bar (depletes when enemies reach end)
-- [ ] Win/lose condition per wave
-- [ ] End-of-wave: save result + points to Supabase
-
-> **Note:** Visual bugs need to be reported back — I can't see the game running.
+### Block 5 — Enemy Waves & Combat (~3 hrs) ✓
+- [x] Enemy sprites moving along path
+- [x] Wave spawner reads config from Supabase (set by Game Engine Agent)
+- [x] Tower attack logic (range detection, projectiles, enemy HP)
+- [x] City HP bar (depletes when enemies reach end)
+- [x] Win/lose condition per wave
+- [x] End-of-wave: save result + points to Supabase
 
 ---
 
-### Block 6 — Game Engine Agent (~2 hrs)
-- [ ] Agent reads financial score from Supabase
-- [ ] Generates wave config:
+### Block 6 — Game Engine Agent (~2 hrs) ✓
+- [x] Agent reads financial score from Supabase
+- [x] Generates wave config:
   - Score 80–100 → easy wave + bonus tower unlocked
   - Score 50–79 → medium wave
   - Score 0–49 → hard wave, city starts slightly damaged
-- [ ] Writes wave_config to Supabase before game session
+- [x] Writes wave_config to Supabase before game session
 
 ---
 
 ## Day 3 — NPCs, Dashboard & Ship
 
-### Block 7 — NPC System (~2 hrs)
-- [ ] **The Warden** — triggers when budget exceeded, harsh tone, flags overspending
-- [ ] **The Scout** — triggers when recurring/subscription charge detected, investigative tone
-- [ ] Each NPC = Ollama call with character system prompt
-- [ ] NPC popup React component (proactive triggers + always clickable)
-- [ ] Conversation stays in-context per session
+### Block 7 — NPC System (~2 hrs) ✓
+- [x] **The Warden** — triggers when budget exceeded, harsh tone, flags overspending
+- [x] **The Scout** — triggers when recurring/subscription charge detected, investigative tone
+- [x] Each NPC = Ollama call with character system prompt + financial context
+- [x] NPC popup React component (proactive triggers + always clickable)
+- [x] Conversation stays in-context per session (full message history passed each turn)
 
 ---
 
-### Block 8 — Dashboard UI (~2 hrs)
-- [ ] Main dashboard: weekly score, spending breakdown by category, goal progress bar
-- [ ] "Play This Week" button → launches Phaser game
-- [ ] Transaction list with Scout-flagged items highlighted
-- [ ] Points + level + city health display
+### Block 8 — Dashboard UI (~2 hrs) ✓
+- [x] Main dashboard: weekly score, spending breakdown by category, goal progress bar
+- [x] "Play This Week" button → launches Phaser game
+- [x] Transaction list with Scout-flagged items highlighted
+- [x] Points + city health display
 
 ---
 
-### Block 9 — Weekly Loop + Wire Everything (~2 hrs)
-- [ ] Orchestrator function `runWeeklyLoop(userId)`:
+### Block 9 — Weekly Loop + Wire Everything (~2 hrs) ✓
+- [x] Orchestrator function `runWeeklyLoop(userId)`:
   1. Nessie sync
   2. Analyst Agent runs → score to Supabase
   3. Game Engine Agent → wave config to Supabase
@@ -238,7 +236,7 @@ wave_config     — user_id, week_number, enemy_count, enemy_speed, enemy_hp, sp
 ---
 
 ### Block 10 — Deploy (~1 hr)
-- [ ] Push to GitHub
+- [x] Push to GitHub
 - [ ] Vercel deploy + add all env vars in Vercel dashboard
 - [ ] Smoke test production build
 

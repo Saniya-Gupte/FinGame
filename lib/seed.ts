@@ -58,7 +58,7 @@ export async function seedNessieAccount(firstName: string, lastName: string) {
     const count = Math.floor(Math.random() * 2) + 2
     for (let i = 0; i < count; i++) {
       const m = MERCHANTS[Math.floor(Math.random() * MERCHANTS.length)]
-      purchasePromises.push(createPurchase(accountId, m.id, rand(m.min, m.max), date))
+      purchasePromises.push(createPurchase(accountId, m.id, m.name, rand(m.min, m.max), date))
     }
   }
 

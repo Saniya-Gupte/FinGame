@@ -48,13 +48,13 @@ export async function getPurchases(accountId: string) {
   return nessieGet(`/accounts/${accountId}/purchases`)
 }
 
-export async function createPurchase(accountId: string, merchant: string, amount: number, date: string) {
+export async function createPurchase(accountId: string, merchantId: string, merchantName: string, amount: number, date: string) {
   return nessiePost(`/accounts/${accountId}/purchases`, {
-    merchant_id: merchant,
+    merchant_id: merchantId,
     medium: 'balance',
     purchase_date: date,
     amount,
-    description: merchant,
+    description: merchantName,
     status: 'completed',
   })
 }

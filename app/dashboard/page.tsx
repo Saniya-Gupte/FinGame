@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import type { GameState, WeeklyGoal, Transaction } from '@/lib/types'
+import type { NPCType } from '@/agents/npc'
+import NPCPopup from '@/components/npc/NPCPopup'
 
 export default function DashboardPage() {
   const router = useRouter()
@@ -13,6 +15,7 @@ export default function DashboardPage() {
   const [goal, setGoal]           = useState<WeeklyGoal | null>(null)
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading]     = useState(true)
+  const [activeNPC, setActiveNPC] = useState<NPCType | null>(null)
   const [syncing, setSyncing]     = useState(false)
   const [syncMsg, setSyncMsg]     = useState('')
   const [needsSetup, setNeedsSetup] = useState(false)
@@ -113,10 +116,17 @@ export default function DashboardPage() {
     </div>
   )
 
-  const spentPct = goal ? Math.min(100, (goal.actual_spent / goal.goal_amount) * 100) : 0
+  const spentPct       = goal ? Math.min(100, (goal.actual_spent / goal.goal_amount) * 100) : 0
+  const overBudget     = goal ? goal.actual_spent > goal.goal_amount : false
+  const hasSubscriptions = transactions.some(t => t.category === 'subscriptions')
+  const hasFlagged     = transactions.some(t => t.flagged)
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
+      {/* NPC Popup */}
+      {activeNPC && userId && (
+        <NPCPopup npcType={activeNPC} userId={userId} onClose={() => setActiveNPC(null)} />
+      )}
       {/* Nav */}
       <nav className="border-b border-gray-800 px-6 py-4 flex justify-between items-center">
         <h1 className="text-xl font-bold text-amber-400">FortifyFi</h1>
@@ -169,6 +179,45 @@ export default function DashboardPage() {
             <p className="text-3xl font-bold text-green-400">{goal?.score ?? '—'}</p>
           </div>
         </div>
+
+        {/* NPC Advisors */}
+        {!needsSetup && (
+          <div className="grid grid-cols-2 gap-4">
+            <button
+              onClick={() => setActiveNPC('warden')}
+              className={`relative text-left p-4 rounded-lg border transition-all hover:scale-[1.02] ${
+                overBudget
+                  ? 'bg-red-950/50 border-red-700 shadow-red-900/30 shadow-lg'
+                  : 'bg-gray-900 border-gray-800 hover:border-red-800'
+              }`}
+            >
+              {overBudget && (
+                <span className="absolute top-3 right-3 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
+              )}
+              <p className="text-2xl mb-1">⚔️</p>
+              <p className="text-white font-semibold">The Warden</p>
+              <p className="text-gray-400 text-xs mt-0.5">Financial Enforcer</p>
+              {overBudget && <p className="text-red-400 text-xs mt-2 font-medium">⚠ Over budget — Warden wants a word</p>}
+            </button>
+
+            <button
+              onClick={() => setActiveNPC('scout')}
+              className={`relative text-left p-4 rounded-lg border transition-all hover:scale-[1.02] ${
+                hasFlagged
+                  ? 'bg-teal-950/50 border-teal-700 shadow-teal-900/30 shadow-lg'
+                  : 'bg-gray-900 border-gray-800 hover:border-teal-800'
+              }`}
+            >
+              {hasFlagged && (
+                <span className="absolute top-3 right-3 w-2.5 h-2.5 bg-teal-400 rounded-full animate-pulse" />
+              )}
+              <p className="text-2xl mb-1">🔍</p>
+              <p className="text-white font-semibold">The Scout</p>
+              <p className="text-gray-400 text-xs mt-0.5">Spending Investigator</p>
+              {hasFlagged && <p className="text-teal-400 text-xs mt-2 font-medium">🔍 Suspicious transactions found</p>}
+            </button>
+          </div>
+        )}
 
         {/* Weekly goal */}
         {goal && (
