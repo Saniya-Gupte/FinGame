@@ -1,0 +1,248 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { supabase } from '@/lib/supabase'
+import type { GameState, WeeklyGoal, Transaction } from '@/lib/types'
+
+export default function DashboardPage() {
+  const router = useRouter()
+  const [userId, setUserId]       = useState<string | null>(null)
+  const [email, setEmail]         = useState<string>('')
+  const [gameState, setGameState] = useState<GameState | null>(null)
+  const [goal, setGoal]           = useState<WeeklyGoal | null>(null)
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [loading, setLoading]     = useState(true)
+  const [syncing, setSyncing]     = useState(false)
+  const [syncMsg, setSyncMsg]     = useState('')
+  const [needsSetup, setNeedsSetup] = useState(false)
+
+  useEffect(() => {
+    async function load() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { router.push('/login'); return }
+      setUserId(user.id)
+      setEmail(user.email ?? '')
+
+      const [{ data: profile }, { data: gs }, { data: wg }, { data: txns }] = await Promise.all([
+        supabase.from('profiles').select('nessie_account_id').eq('id', user.id).single(),
+        supabase.from('game_state').select('*').eq('user_id', user.id).single(),
+        supabase.from('weekly_goals').select('*').eq('user_id', user.id).eq('completed', false)
+          .order('created_at', { ascending: false }).limit(1).single(),
+        supabase.from('transactions').select('*').eq('user_id', user.id)
+          .order('transaction_date', { ascending: false }).limit(20),
+      ])
+
+      if (!profile?.nessie_account_id) setNeedsSetup(true)
+      if (gs) setGameState(gs)
+      if (wg) setGoal(wg)
+      if (txns) setTransactions(txns)
+      setLoading(false)
+    }
+    load()
+  }, [])
+
+  async function getToken(): Promise<string | null> {
+    const { data: { session } } = await supabase.auth.getSession()
+    return session?.access_token ?? null
+  }
+
+  async function handleSetup() {
+    if (!userId) return
+    setSyncing(true)
+    setSyncMsg('Setting up your account...')
+    const token = await getToken()
+    if (!token) { setSyncMsg('Not authenticated'); setSyncing(false); return }
+
+    const res = await fetch('/api/seed', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ userId, firstName: 'Player', lastName: 'One' }),
+    })
+    if (res.ok) {
+      setSyncMsg('Running financial analysis (this takes ~30s)...')
+      const loop = await fetch('/api/weekly-loop', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ userId }),
+      })
+      if (loop.ok) {
+        setSyncMsg('Done! Reloading...')
+        setTimeout(() => window.location.reload(), 3000)
+      } else {
+        const err = await loop.json()
+        setSyncMsg(`Analysis failed: ${err.error}`)
+      }
+    } else {
+      const err = await res.json()
+      setSyncMsg(`Setup failed: ${err.error}`)
+    }
+    setSyncing(false)
+  }
+
+  async function handleSync() {
+    if (!userId) return
+    setSyncing(true)
+    setSyncMsg('Syncing financial data...')
+    const token = await getToken()
+    if (!token) { setSyncMsg('Not authenticated'); setSyncing(false); return }
+
+    const res = await fetch('/api/weekly-loop', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ userId }),
+    })
+    if (res.ok) {
+      setSyncMsg('Sync complete! Reloading...')
+      setTimeout(() => window.location.reload(), 3000)
+    } else {
+      const err = await res.json()
+      setSyncMsg(`Sync failed: ${err.error}`)
+    }
+    setSyncing(false)
+  }
+
+  async function handleLogout() {
+    await supabase.auth.signOut()
+    router.push('/')
+  }
+
+  if (loading) return (
+    <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+      <p className="text-amber-400 text-xl animate-pulse">Loading...</p>
+    </div>
+  )
+
+  const spentPct = goal ? Math.min(100, (goal.actual_spent / goal.goal_amount) * 100) : 0
+
+  return (
+    <div className="min-h-screen bg-gray-950 text-white">
+      {/* Nav */}
+      <nav className="border-b border-gray-800 px-6 py-4 flex justify-between items-center">
+        <h1 className="text-xl font-bold text-amber-400">FortifyFi</h1>
+        <div className="flex items-center gap-4">
+          <span className="text-gray-400 text-sm">{email}</span>
+          <button onClick={handleLogout} className="text-sm text-gray-400 hover:text-white transition-colors">
+            Logout
+          </button>
+        </div>
+      </nav>
+
+      <main className="max-w-5xl mx-auto px-6 py-8 space-y-6">
+
+        {/* Setup banner */}
+        {needsSetup && (
+          <div className="bg-amber-950/50 border border-amber-600 rounded-lg p-5">
+            <h2 className="text-amber-400 font-bold text-lg mb-1">Welcome to FortifyFi!</h2>
+            <p className="text-gray-300 text-sm mb-4">
+              Set up your account to generate spending data and unlock the game.
+            </p>
+            <button
+              onClick={handleSetup}
+              disabled={syncing}
+              className="px-5 py-2 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-semibold rounded-lg transition-colors"
+            >
+              {syncing ? syncMsg : 'Set Up Account'}
+            </button>
+          </div>
+        )}
+
+        {/* Sync status */}
+        {syncMsg && !needsSetup && (
+          <div className="bg-gray-800 border border-gray-700 rounded-lg p-3 text-sm text-gray-300">
+            {syncMsg}
+          </div>
+        )}
+
+        {/* Stats row */}
+        <div className="grid grid-cols-3 gap-4">
+          <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
+            <p className="text-gray-400 text-xs uppercase tracking-wide mb-1">Points</p>
+            <p className="text-3xl font-bold text-amber-400">{gameState?.points ?? 0}</p>
+          </div>
+          <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
+            <p className="text-gray-400 text-xs uppercase tracking-wide mb-1">City HP</p>
+            <p className="text-3xl font-bold text-red-400">{gameState?.city_health ?? 100}</p>
+          </div>
+          <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
+            <p className="text-gray-400 text-xs uppercase tracking-wide mb-1">Week Score</p>
+            <p className="text-3xl font-bold text-green-400">{goal?.score ?? '—'}</p>
+          </div>
+        </div>
+
+        {/* Weekly goal */}
+        {goal && (
+          <div className="bg-gray-900 rounded-lg p-5 border border-gray-800">
+            <div className="flex justify-between items-center mb-3">
+              <h2 className="text-white font-semibold">This Week's Budget</h2>
+              <span className="text-sm text-gray-400">Goal: ${goal.goal_amount}</span>
+            </div>
+            <div className="w-full bg-gray-800 rounded-full h-3 mb-2">
+              <div
+                className={`h-3 rounded-full transition-all ${spentPct > 90 ? 'bg-red-500' : spentPct > 70 ? 'bg-amber-500' : 'bg-green-500'}`}
+                style={{ width: `${spentPct}%` }}
+              />
+            </div>
+            <div className="flex justify-between text-sm text-gray-400">
+              <span>Spent: ${goal.actual_spent.toFixed(2)}</span>
+              <span className={spentPct > 100 ? 'text-red-400' : 'text-gray-400'}>
+                {spentPct > 100 ? `$${(goal.actual_spent - goal.goal_amount).toFixed(2)} over` : `$${(goal.goal_amount - goal.actual_spent).toFixed(2)} remaining`}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Play + Sync buttons */}
+        <div className="flex gap-4">
+          <button
+            onClick={() => router.push('/game')}
+            disabled={needsSetup}
+            className="flex-1 py-3 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-black font-bold rounded-lg transition-colors text-lg"
+          >
+            Play This Week
+          </button>
+          <button
+            onClick={handleSync}
+            disabled={syncing || needsSetup}
+            className="px-5 py-3 border border-gray-700 hover:border-gray-500 disabled:opacity-40 text-gray-300 rounded-lg transition-colors text-sm"
+          >
+            {syncing ? 'Syncing...' : 'Sync Data'}
+          </button>
+        </div>
+
+        {/* Transactions */}
+        {transactions.length > 0 && (
+          <div className="bg-gray-900 rounded-lg border border-gray-800">
+            <div className="p-4 border-b border-gray-800">
+              <h2 className="text-white font-semibold">Recent Transactions</h2>
+            </div>
+            <div className="divide-y divide-gray-800">
+              {transactions.map(txn => (
+                <div key={txn.id} className="px-4 py-3 flex justify-between items-center">
+                  <div className="flex items-center gap-3">
+                    {txn.flagged && (
+                      <span className="text-xs bg-red-900/50 text-red-400 border border-red-800 px-2 py-0.5 rounded-full">
+                        flagged
+                      </span>
+                    )}
+                    <div>
+                      <p className="text-white text-sm">{txn.merchant ?? 'Unknown'}</p>
+                      {txn.flag_reason && (
+                        <p className="text-red-400 text-xs">{txn.flag_reason}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-white text-sm font-medium">${txn.amount.toFixed(2)}</p>
+                    <p className="text-gray-500 text-xs">{txn.category}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+      </main>
+    </div>
+  )
+}
